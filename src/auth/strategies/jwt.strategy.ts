@@ -9,7 +9,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: 'YOUR_SECRET_KEY', // TODO: Move to environment variable
+      secretOrKey: process.env.JWT_SECRET || 'super_secret_cle_pour_tana_antsirabe_2026',
     });
   }
 

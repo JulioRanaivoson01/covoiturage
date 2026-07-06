@@ -24,8 +24,12 @@ export class UsersService {
   }
 
   async findByCinNumber(cinNumber: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { cinNumber } });
+  // 🌟 Sécurité : si le front n'envoie pas de CIN, on ignore la recherche en BDD
+  if (!cinNumber) {
+    return null;
   }
+  return this.usersRepository.findOne({ where: { cinNumber } });
+}
 
   async update(id: string, userData: Partial<User>): Promise<User> {
     await this.usersRepository.update(id, userData);

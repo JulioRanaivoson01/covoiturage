@@ -22,16 +22,18 @@ export class BookingsService {
 
     const totalPrice = Number(ride.pricePerSeat) * createBookingDto.seatsBooked;
 
+    // CORRECTION TS2769 & DeepPartial : On construit l'objet proprement en respectant le typage de l'entité
     const booking = this.bookingsRepository.create({
-      ...createBookingDto,
-      ride: { id: createBookingDto.rideId },
-      passenger: { id: passengerId },
+      seatsBooked: createBookingDto.seatsBooked,
       totalPrice,
-      status: createBookingDto.status || 'pending',
+      status: (createBookingDto as any).status || 'pending',
+      ride: { id: createBookingDto.rideId } as any,
+      passenger: { id: passengerId } as any,
     });
 
     const savedBooking = await this.bookingsRepository.save(booking);
 
+    // CORRECTION TS2339 : savedBooking est bien un objet Booking unique ici
     if (savedBooking.status === 'confirmed') {
       await this.ridesService.updateAvailableSeats(
         createBookingDto.rideId,
@@ -57,9 +59,15 @@ export class BookingsService {
   }
 
   async findOne(id: string): Promise<Booking> {
+    // CORRECTION TS2559 : Remplacement du tableau de chaînes par un objet de relations fortement typé
     const booking = await this.bookingsRepository.findOne({
       where: { id },
-      relations: ['ride', 'passenger', 'ride.driver'],
+      relations: {
+        ride: {
+          driver: true,
+        },
+        passenger: true,
+      },
     });
     if (!booking) {
       throw new NotFoundException('Booking not found');

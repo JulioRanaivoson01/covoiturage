@@ -8,8 +8,8 @@ import { LoginDto } from './dto/login.dto';
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<{ access_token: string; user: any }> {
@@ -18,11 +18,13 @@ export class AuthService {
       throw new UnauthorizedException('Email already exists');
     }
 
-    const existingCin = await this.usersService.findByCinNumber(registerDto.cinNumber);
-    if (existingCin) {
-      throw new UnauthorizedException('CIN number already exists');
+    // Only check for existing CIN if a CIN number is provided
+    if (registerDto.cinNumber) {
+      const existingCin = await this.usersService.findByCinNumber(registerDto.cinNumber);
+      if (existingCin) {  // ✅ Correct indentation (8 spaces)
+        throw new UnauthorizedException('CIN number already exists');
+      }
     }
-
     const passwordHash = await bcrypt.hash(registerDto.password, 10);
 
     const user = await this.usersService.create({

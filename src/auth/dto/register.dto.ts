@@ -25,8 +25,9 @@ export class RegisterDto {
   @IsString()
   phoneNumber: string;
 
+  @IsOptional()
   @IsString()
-  cinNumber: string;
+  cinNumber?: string;
 
   @IsOptional()
   @IsString()

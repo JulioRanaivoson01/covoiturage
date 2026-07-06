@@ -58,9 +58,13 @@ export class RidesService {
   }
 
   async findOne(id: string): Promise<Ride> {
+    // CORRECTION TS2559 : Utilisation d'un objet fortement typé à la place du tableau de chaînes
     const ride = await this.ridesRepository.findOne({
       where: { id },
-      relations: ['driver', 'bookings'],
+      relations: {
+        driver: true,
+        bookings: true,
+      },
     });
     if (!ride) {
       throw new NotFoundException('Ride not found');
