@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Ride } from './entities/ride.entity';
 import { CreateRideDto } from './dto/create-ride.dto';
+import { UpdateRideDto } from './dto/update-ride.dto';
 
 @Injectable()
 export class RidesService {
@@ -37,7 +38,6 @@ async create(createRideDto: CreateRideDto, userId: string) {
     const queryBuilder = this.ridesRepository
       .createQueryBuilder('ride')
       .leftJoinAndSelect('ride.driver', 'driver')
-      .addSelect('ride.carImageUri')
       .where('ride.departureTime > :now', { now: new Date() })
       .andWhere('ride.availableSeats > :minSeats', { minSeats: 0 });
 
@@ -111,5 +111,38 @@ async create(createRideDto: CreateRideDto, userId: string) {
         departureTime: 'DESC', // Les trajets les plus récents en premier
       },
     });
+  }
+    async update(id: string, updateRideDto: UpdateRideDto, userId: string): Promise<Ride> {
+    const ride = await this.findOne(id);
+    
+    if (ride.driver.id !== userId) {
+      throw new ForbiddenException('You are not the owner of this ride');
+    }
+
+    if (updateRideDto.totalSeats && updateRideDto.totalSeats < ride.bookings.length) {
+      throw new Error('Cannot reduce total seats below current bookings');
+    }
+
+    Object.assign(ride, updateRideDto);
+    
+    if (updateRideDto.totalSeats) {
+      ride.availableSeats = updateRideDto.totalSeats - (ride.totalSeats - ride.availableSeats);
+    }
+
+    return this.ridesRepository.save(ride);
+  }
+
+  async remove(id: string, userId: string): Promise<void> {
+    const ride = await this.findOne(id);
+    
+    if (ride.driver.id !== userId) {
+      throw new ForbiddenException('You are not the owner of this ride');
+    }
+
+    if (ride.bookings.length > 0) {
+      throw new Error('Cannot delete a ride with existing bookings');
+    }
+
+    await this.ridesRepository.remove(ride);
   }
 }

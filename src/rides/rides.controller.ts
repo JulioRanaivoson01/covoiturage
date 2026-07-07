@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request, Param, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Query, UseGuards, Request, Param, UseInterceptors, UploadedFile, HttpCode, HttpStatus } from '@nestjs/common';
 import { RidesService } from './rides.service';
 import { CreateRideDto } from './dto/create-ride.dto';
+import { UpdateRideDto } from './dto/update-ride.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -19,7 +20,7 @@ export class RidesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads',
+        destination: './uploads/cars',
         filename: (req, file, cb) => {
           const randomName = Array(32)
             .fill(null)
@@ -43,10 +44,8 @@ export class RidesController {
     if (!file) {
       throw new Error('No file uploaded');
     }
-    return {
-      filename: file.filename,
-      originalname: file.originalname,
-      path: `/uploads/${file.filename}`,
+       return {
+      imageUrl: `http://192.168.1.244:3000/uploads/cars/${file.filename}`,
     };
   }
   @Get()
@@ -69,6 +68,19 @@ export class RidesController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.ridesService.findOne(id);
+  }
+    @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  async update(@Param('id') id: string, @Body() updateRideDto: UpdateRideDto, @Request() req) {
+    return this.ridesService.update(id, updateRideDto, req.user.id);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async remove(@Param('id') id: string, @Request() req) {
+    await this.ridesService.remove(id, req.user.id);
+    return { message: 'Ride deleted successfully' };
   }
   
 }
