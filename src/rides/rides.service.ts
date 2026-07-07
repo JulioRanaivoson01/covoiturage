@@ -10,16 +10,24 @@ export class RidesService {
     @InjectRepository(Ride)
     private ridesRepository: Repository<Ride>,
   ) {}
+async create(createRideDto: CreateRideDto, userId: string) {
+  const newRide = this.ridesRepository.create({
+    departure: createRideDto.departure,
+    arrival: createRideDto.arrival,
+    departureTime: createRideDto.departureTime,
+    pricePerSeat: createRideDto.pricePerSeat,
+    totalSeats: createRideDto.totalSeats,
+    availableSeats: createRideDto.totalSeats,
+    carModel: createRideDto.carModel,
+    luggageAllowed: createRideDto.luggageAllowed,
+    description: createRideDto.description,
+    // On force l'affectation ici :
+    carImageUri: createRideDto.carImageUri, 
+    driver: { id: userId },
+  });
 
-  async create(createRideDto: CreateRideDto, driverId: string): Promise<Ride> {
-    const ride = this.ridesRepository.create({
-      ...createRideDto,
-      driver: { id: driverId },
-      availableSeats: createRideDto.totalSeats,
-      departureTime: new Date(createRideDto.departureTime),
-    });
-    return this.ridesRepository.save(ride);
-  }
+  return await this.ridesRepository.save(newRide);
+}
 
   async findAll(filters?: {
     departure?: string;
@@ -29,6 +37,7 @@ export class RidesService {
     const queryBuilder = this.ridesRepository
       .createQueryBuilder('ride')
       .leftJoinAndSelect('ride.driver', 'driver')
+      .addSelect('ride.carImageUri')
       .where('ride.departureTime > :now', { now: new Date() })
       .andWhere('ride.availableSeats > :minSeats', { minSeats: 0 });
 
@@ -86,5 +95,21 @@ export class RidesService {
     
     ride.availableSeats = newAvailableSeats;
     return this.ridesRepository.save(ride);
+  }
+  // 🌟 AJOUT DE LA MÉTHODE MANQUANTE
+  async findByDriver(driverId: string): Promise<Ride[]> {
+    return await this.ridesRepository.find({
+      where: {
+        driver: { id: driverId }, // Filtre en utilisant la relation avec le conducteur
+      },
+      relations: {
+        // Optionnel : ajoute ici les relations si tu veux afficher 
+        // les détails du conducteur ou des réservations sur l'écran "Mes Trajets"
+        driver: true, 
+      },
+      order: {
+        departureTime: 'DESC', // Les trajets les plus récents en premier
+      },
+    });
   }
 }

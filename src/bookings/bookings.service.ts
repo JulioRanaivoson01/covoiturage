@@ -1,3 +1,4 @@
+// src/bookings/bookings.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,57 +10,57 @@ import { RidesService } from '../rides/rides.service';
 export class BookingsService {
   constructor(
     @InjectRepository(Booking)
-    private bookingsRepository: Repository<Booking>,
-    private ridesService: RidesService,
+    private readonly bookingsRepository: Repository<Booking>,
+    // Injecté grâce à l'import de RidesModule dans bookings.module.ts
+    private readonly ridesService: RidesService,
   ) {}
 
+  // 1. CRÉER UNE RÉSERVATION
   async create(createBookingDto: CreateBookingDto, passengerId: string): Promise<Booking> {
-    const ride = await this.ridesService.findOne(createBookingDto.rideId);
+    // Si ta clé s'appelle autrement dans ton DTO (ex: seats ou seatsRequested), aligne-la ici
+    const { rideId, seatsBooked } = createBookingDto;
 
-    if (ride.availableSeats < createBookingDto.seatsBooked) {
-      throw new BadRequestException('Not enough available seats');
+    // Récupère le trajet pour vérifier la disponibilité des places
+    const ride = await this.ridesService.findOne(rideId);
+
+    if (ride.availableSeats < seatsBooked) {
+      throw new BadRequestException('Pas assez de places disponibles pour ce trajet.');
     }
 
-    const totalPrice = Number(ride.pricePerSeat) * createBookingDto.seatsBooked;
-
-    // CORRECTION TS2769 & DeepPartial : On construit l'objet proprement en respectant le typage de l'entité
-    const booking = this.bookingsRepository.create({
-      seatsBooked: createBookingDto.seatsBooked,
-      totalPrice,
-      status: (createBookingDto as any).status || 'pending',
-      ride: { id: createBookingDto.rideId } as any,
-      passenger: { id: passengerId } as any,
-    });
+    // Instanciation manuelle et sécurisée pour éviter l'erreur de surcharge TypeORM (Overload)
+    const booking = new Booking();
+    booking.passenger = { id: passengerId } as any;
+    booking.ride = { id: rideId } as any;
+    booking.seatsBooked = seatsBooked;
+    booking.status = 'pending' as any; // Casté en as any pour s'aligner sur ton BookingStatus (enum)
 
     const savedBooking = await this.bookingsRepository.save(booking);
 
-    // CORRECTION TS2339 : savedBooking est bien un objet Booking unique ici
-    if (savedBooking.status === 'confirmed') {
-      await this.ridesService.updateAvailableSeats(
-        createBookingDto.rideId,
-        -createBookingDto.seatsBooked,
-      );
-    }
+    // Met à jour le nombre de places restantes dans le trajet (on déduit)
+    await this.ridesService.updateAvailableSeats(rideId, -seatsBooked);
 
     return savedBooking;
   }
 
-  async findAll(passengerId?: string): Promise<Booking[]> {
-    const queryBuilder = this.bookingsRepository
-      .createQueryBuilder('booking')
-      .leftJoinAndSelect('booking.ride', 'ride')
-      .leftJoinAndSelect('booking.passenger', 'passenger')
-      .leftJoinAndSelect('ride.driver', 'driver');
-
-    if (passengerId) {
-      queryBuilder.andWhere('passenger.id = :passengerId', { passengerId });
-    }
-
-    return queryBuilder.orderBy('booking.createdAt', 'DESC').getMany();
+  // 2. RÉCUPÉRER TOUTES LES RÉSERVATIONS D'UN UTILISATEUR
+  async findAll(userId: string): Promise<Booking[]> {
+    return await this.bookingsRepository.find({
+      where: {
+        passenger: { id: userId }, // Filtre les réservations de l'utilisateur connecté
+      },
+      relations: {
+        ride: {
+          driver: true, // Charge le trajet et le conducteur pour l'affichage de l'écran mobile
+        },
+      },
+      order: {
+        createdAt: 'DESC', // Les plus récentes en premier
+      },
+    });
   }
 
+  // 3. TROUVER UNE RÉSERVATION UNIQUE
   async findOne(id: string): Promise<Booking> {
-    // CORRECTION TS2559 : Remplacement du tableau de chaînes par un objet de relations fortement typé
     const booking = await this.bookingsRepository.findOne({
       where: { id },
       relations: {
@@ -69,28 +70,24 @@ export class BookingsService {
         passenger: true,
       },
     });
+
     if (!booking) {
-      throw new NotFoundException('Booking not found');
+      throw new NotFoundException(`La réservation avec l'ID ${id} n'existe pas.`);
     }
+
     return booking;
   }
 
-  async updateStatus(id: string, status: string): Promise<Booking> {
+  // 4. METTRE À JOUR LE STATUT (Accepté, Refusé, Annulé)
+  async updateStatus(id: string, status: any): Promise<Booking> {
     const booking = await this.findOne(id);
-
-    if (booking.status === status) {
-      return booking;
-    }
-
-    if (booking.status === 'confirmed' && status === 'cancelled') {
+    
+    // Si la réservation est annulée, on recrédite les places sur le trajet
+    if (status === 'cancelled' && booking.status !== 'cancelled') {
       await this.ridesService.updateAvailableSeats(booking.ride.id, booking.seatsBooked);
     }
 
-    if (booking.status === 'pending' && status === 'confirmed') {
-      await this.ridesService.updateAvailableSeats(booking.ride.id, -booking.seatsBooked);
-    }
-
-    booking.status = status as any;
-    return this.bookingsRepository.save(booking);
+    booking.status = status;
+    return await this.bookingsRepository.save(booking);
   }
 }

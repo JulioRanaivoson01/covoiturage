@@ -1,5 +1,5 @@
 import { IsString, IsNumber, IsEnum, IsDateString, IsOptional, Min, Max } from 'class-validator';
-import { LuggageAllowed } from '../entities/ride.entity';
+import { LuggageAllowed, TripStatus } from '../entities/ride.entity';
 
 export class CreateRideDto {
   @IsString()
@@ -30,4 +30,12 @@ export class CreateRideDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  carImageUri?: string;
+  
+  @IsEnum(TripStatus)
+  @IsOptional()
+  status?: TripStatus;
 }

@@ -8,6 +8,13 @@ export enum LuggageAllowed {
   LARGE = 'large',
 }
 
+export enum TripStatus {
+  PENDING = 'PENDING',
+  ONGOING = 'ONGOING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
 @Entity('rides')
 export class Ride {
   @PrimaryGeneratedColumn('uuid')
@@ -41,8 +48,18 @@ export class Ride {
   })
   luggageAllowed: LuggageAllowed;
 
+  @Column({
+    type: 'enum',
+    enum: TripStatus,
+    default: TripStatus.PENDING,
+  })
+  status: TripStatus;
+
   @Column({ nullable: true })
   description: string;
+
+  @Column({ nullable: true }) 
+  carImageUri: string;
 
   @ManyToOne(() => User, (user) => user.rides)
   driver: User;

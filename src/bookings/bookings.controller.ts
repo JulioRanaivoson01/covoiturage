@@ -1,3 +1,4 @@
+// src/bookings/bookings.controller.ts
 import { Controller, Get, Post, Body, Param, Patch, UseGuards, Request } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -16,6 +17,7 @@ export class BookingsController {
   @Get()
   @UseGuards(JwtAuthGuard)
   async findAll(@Request() req) {
+    // Extrait proprement l'ID de l'utilisateur connecté via son jeton JWT
     return this.bookingsService.findAll(req.user.id);
   }
 
